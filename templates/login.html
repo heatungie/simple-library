@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Вход
+{% endblock %}
+ 
+{% block body %}
+    <div class="login-container">
+      <h1 class="login-title"> Вход </h1>
+      <form class="login-form" method="post">
+        <input name="login" class="login-input" required type="text" placeholder="Логин">
+        <input name="password" class="login-input" required type="password" placeholder="Пароль">
+        {% for category, message in get_flashed_messages(True) %}
+        <div class="flash {{ category }}" style="margin-right: 0;">{{ message }}</div>
+        {% endfor %}
+        <a class="r-link" href="/registration"> У меня нет аккаунта</a>
+        <input name="enter" class="login-button" type="submit" value="Далее">
+      </form>
+    </div>
+
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Добавление книги
+{% endblock %}
+ 
+{% block body %}
+    <div class="login-container">
+        <h1 class="login-title"> Добавление книги </h1>
+        <form class="upload-form" method="post" enctype=multipart/form-data>
+            <div class="input-with-title">
+                Название
+                <input name="title" required class="upload-input" type="text" placeholder="Название">
+            </div>
+            <div class="input-with-title">
+                Автор
+                <input name="author" required class="upload-input" type="text" placeholder="Автор">
+            </div>
+            <div class="input-with-title">
+                Описание
+                <input name="description" required class="upload-input" type="text" placeholder="Описание">
+            </div>
+            <div class="input-with-title">
+                Жанр
+                <input name="genre" required class="upload-input" type="text" placeholder="Жанр">
+            </div>
+            <div class="input-with-title">
+                Год написания
+                <input name="created_date" required class="upload-input" type="number" placeholder="Год написания">
+            </div>
+            <div class="input-with-title">
+                Файл книги
+                <input 
+                    name="book_file" 
+                    required 
+                    class="upload-input" 
+                    type="file"
+                    accept=".epub,.fb2,.mobi,.kf8,.azw,.lrf,.txt,.doc,.docx,.rtf,.pdf,.djvu">  
+            </div>
+            {% for category, message in get_flashed_messages(True) %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        <input name="enter" class="login-button" type="submit" value="Добавить">
+        </form>
+    </div>
+
+{% endblock %}

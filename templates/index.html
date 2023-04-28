@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Home page
+{% endblock %}
+
+{% block body %}
+  <div class = "buttonsWrap container">
+    <div class="dropdown">
+      <button class="filterSearch dropdown-toggle"type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+        Сортировка по
+      </button>
+      <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'source') }}">Источнику</a></li>
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'title') }}">Названию</a></li>
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'description') }}">Описанию</a></li>
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'date') }}">Дате</a></li>
+      </ul>
+    </div>
+    <div>
+      {% if reverse %}
+        <a class="filterSearch" href="?{{ rmparams(qs, 'r') }}" style="width: 91%;">Обычный порядок</a>
+      {% else %}
+        <a class="filterSearch" href="?{{ addparam(rmparams(qs, 'r'), 'r', '1') }}" style="width: 91%;">Обратный порядок</a>
+      {% endif %}
+    </div>
+    <div class="dropdown">
+      <button class="filterSearch bttn dropdown-toggle" style="width: 91%;" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+        Поиск по
+      </button>
+      <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', 'source') }}">Источнику</a></li>
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', 'title') }}">Названию</a></li>
+        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', 'description') }}">Описанию</a></li>
+      </ul>
+    </div>
+    <form class="searchWrap">
+      <input name="search" class="filterSearch" placeholder="Поиск по {{ searchby }}" value="{{ getparam(qs, 'search') }}">
+      {% for parameter in rmparams(qs, 'search').split('&') %}
+      <input type="hidden" name="{{ parameter.split('=')[0] }}" value="{{ parameter.split('=')[1] }}">
+      {% endfor %}
+      <a class="filterSearch" href="?{{ rmparams(qs, 'search') }}"><i class="fas fa-trash-alt"></i></a>
+      <button type="submit" class="filterSearch">Искать</button>
+    </form>
+  </div>
+{% for article in news %}
+    <div class="col-md container">
+        <div class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">
+        <div class="col p-4 d-flex flex-column position-static">
+            <strong class="d-inline-block mb-2 text-primary">{{ article['source'] }}</strong>
+            <h3 class="mb-0">{{ article['title'] }}</h3>
+            <div class="mb-1 text-muted">{{ article['date'][:-8] }}</div>
+            <p class="card-text mb-auto">{{ article['description'] }}</p>
+            <a href="http://{{ article['link'] }}" class="stretched-link" style="margin-top: 10px;">Читать далее</a>
+        </div>
+        <div class="col-auto d-none d-lg-block" name="block">
+            <img 
+                src="{{ url_for('static', filename='img/') + article['img_source'] }}" 
+                id="block2"
+                class="sourceImg"> 
+                <rect width="100%" height="100%" fill="#55595c"></rect>
+            </img>
+        </div>
+        </div>
+    </div>
+{% endfor %}
+
+<div class="pagination">
+    {% if page > 1 %}
+        <a href="?{{ addparam(rmparams(qs, 'p'), 'p', page - 1) }}">«</a>
+    {% endif %}
+    {% for page_num in pages_buttons %}
+        <a {% if page_num == page %}class="active"{% endif %} href="?{{ addparam(rmparams(qs, 'p'), 'p', page_num) }}">{{ page_num }}</a>
+    {% endfor %}
+    {% if page < pages_amount %}
+        <a href="?{{ addparam(rmparams(qs, 'p'), 'p', page + 1) }}">»</a>
+    {% endif %}
+</div>
+
+{% endblock %}
