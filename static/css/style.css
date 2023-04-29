@@ -9,7 +9,7 @@
     border: 2px solid;
     border-radius: 6px;
     transition: 0.2s;
-    width: 200px;
+    width: fit-content;
     
 }
 .stretched-link:hover { background: rgb(83, 83, 83); color: #ffffff;}
@@ -49,7 +49,8 @@
 
 .buttonsWrap { 
     display: grid;
-    grid-template-columns: 6fr 7fr 6fr 16fr;
+    /* grid-template-columns: 6fr 7fr 6fr 16fr; */
+    grid-template-columns: 244px 258px 221px 290px;
 }
 
 .filterSearch {

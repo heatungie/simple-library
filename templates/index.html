@@ -11,10 +11,10 @@ Home page
         Сортировка по
       </button>
       <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'source') }}">Источнику</a></li>
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'title') }}">Названию</a></li>
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'description') }}">Описанию</a></li>
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', 'date') }}">Дате</a></li>
+        {% for param in parameters %}
+        <li><a class="dropdown-item {% if sorting == param %} active {% endif %}" href="?{{ addparam(rmparams(qs, 'sort'), 'sort', param) }}">{{ parameters[param].capitalize()}}</a></li>
+        {% endfor %}
+
       </ul>
     </div>
     <div>
@@ -29,13 +29,13 @@ Home page
         Поиск по
       </button>
       <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', 'source') }}">Источнику</a></li>
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', 'title') }}">Названию</a></li>
-        <li><a class="dropdown-item" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', 'description') }}">Описанию</a></li>
+        {% for param in parameters %}
+        <li><a class="dropdown-item {% if filter == param %} active {% endif %}" href="?{{ addparam(rmparams(qs, 'searchby'), 'searchby', param) }}">{{ parameters[param].capitalize() }}</a></li>
+        {% endfor %}
       </ul>
     </div>
     <form class="searchWrap">
-      <input name="search" class="filterSearch" placeholder="Поиск по {{ searchby }}" value="{{ getparam(qs, 'search') }}">
+      <input name="search" class="filterSearch" placeholder="Поиск по {{ parameters[filter] }}" value="{{ getparam(qs, 'search') }}">
       {% for parameter in rmparams(qs, 'search').split('&') %}
       <input type="hidden" name="{{ parameter.split('=')[0] }}" value="{{ parameter.split('=')[1] }}">
       {% endfor %}
@@ -43,19 +43,19 @@ Home page
       <button type="submit" class="filterSearch">Искать</button>
     </form>
   </div>
-{% for article in news %}
+{% for book in books %}
     <div class="col-md container">
         <div class="row g-0 border rounded overflow-hidden flex-md-row mb-4 shadow-sm h-md-250 position-relative">
         <div class="col p-4 d-flex flex-column position-static">
-            <strong class="d-inline-block mb-2 text-primary">{{ article['source'] }}</strong>
-            <h3 class="mb-0">{{ article['title'] }}</h3>
-            <div class="mb-1 text-muted">{{ article['date'][:-8] }}</div>
-            <p class="card-text mb-auto">{{ article['description'] }}</p>
-            <a href="http://{{ article['link'] }}" class="stretched-link" style="margin-top: 10px;">Читать далее</a>
+            <strong class="d-inline-block mb-2 text-primary">{{ book['author'] }}</strong>
+            <h3 class="mb-0">{{ book['title'] }}</h3>
+            <div class="mb-1 text-muted">{{ book['id'] }}</div>
+            <p class="card-text mb-auto">{{ book['description'] }}</p>
+            <a href="book/{{ book['id'] }}" class="stretched-link" style="margin-top: 10px;">Подробнее</a>
         </div>
         <div class="col-auto d-none d-lg-block" name="block">
             <img 
-                src="{{ url_for('static', filename='img/') + article['img_source'] }}" 
+                src="{{ url_for('static', filename='img/') + book['title'] }}" 
                 id="block2"
                 class="sourceImg"> 
                 <rect width="100%" height="100%" fill="#55595c"></rect>

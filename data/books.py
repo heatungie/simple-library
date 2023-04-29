@@ -11,6 +11,7 @@ class Books(SqlAlchemyBase):
     id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
     title = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     description = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+    author = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     genre = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     creation_year = sqlalchemy.Column(sqlalchemy.Integer, default=datetime.date.today().year)
     file_url = sqlalchemy.Column(sqlalchemy.String, nullable=True)

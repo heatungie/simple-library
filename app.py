@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, flash, redirect
+from sqlalchemy import func, desc, orm
 from urllib.parse import unquote_plus
 from data import db_session
 from data.users import User
@@ -11,6 +12,20 @@ from os import path
 
 UPLOAD_FOLDER = './static/books/'
 ALLOWED_EXTENSIONS = {'epub', 'fb2', 'mobi', 'kf8', 'azw', 'lrf', 'txt', 'doc', 'docx', 'rtf', 'pdf', 'djvu'}
+
+allowed_params = {
+    'sort': ('id', 'title', 'description', 'genre', 'creation_year', 'author'),
+    'searchby': ('title', 'description', 'genre', 'author')
+}
+
+defalut_params = {
+    'sort': 'id',
+    'r': '0',
+    'perpage': '8',
+    'p': '0',
+    'searchby': 'title',
+    'search': ''
+}
 
 app = Flask(__name__)
 
@@ -47,49 +62,53 @@ def getparam(query_string, param_to_get):
     param_to_return = [param.split('=')[1] for param in params if param.split('=')[0] == param_to_get]
     return unquote_plus(param_to_return[0]) if param_to_return else ''
 
+# getattr(Study, order_by_column)
+def get_books_page(start, end, sortby, reverse_arg, filterby, filterword):
+    db_sess = db_session.create_session()
+    reverse = ('desc' if reverse_arg else 'asc')
+
+    query = (db_sess.query(Books)
+             .filter((getattr(Books, filterby).like(f'%{filterword}%') | \
+                      (getattr(Books, filterby).like(f'%{filterword.capitalize()}%'))))
+             .order_by(getattr(getattr(Books, sortby), reverse)())
+             .slice(start, end))
+
+    db_sess.close()
+    return [book.__dict__ for book in query]
+
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
     args = request.args
     sorting_arg, reverse_arg, per_page_arg, page_arg, filterby_arg, filterword_arg = \
         args.get('sort', default='id'), 'r' in args and args.get('r') != '0', args.get('perpage', default='8'), \
-        args.get('p', default='0'), args.get('searchby', default='title'), args.get('search', default='')
+        args.get('p', default='0'), args.get('searchby', default='title'), str(args.get('search', default=''))
+    print(filterword_arg)
     
+    sorting_arg = (sorting_arg if sorting_arg in allowed_params['sort'] else defalut_params['sort'])
+    filterby_arg = (filterby_arg if filterby_arg in allowed_params['searchby'] else defalut_params['searchby'])
     per_page = int(per_page_arg) if per_page_arg.isdecimal() and int(per_page_arg) >= 1 else 10
     query_string = request.query_string.decode("utf-8")
 
     db_sess = db_session.create_session()
     library_size = db_sess.query(Books).count()
-    
-    # Should be replaced later with database functions
-    # library_size = 100
+
     pages_amount = int(library_size / per_page + 0.9)
 
     page = int(page_arg) if page_arg.isdecimal() and 1 <= int(page_arg) <= pages_amount \
         else 1 if int(page_arg) <= pages_amount else pages_amount
-    from datetime import datetime
-    books_page = [
-        {
-        'id': 0,
-        'date': str(datetime(2023, 2, 24, 15, 56, 29, 188963)),
-        'title': 'Book 0',
-        'link': 'https://example.com/',
-        'description': 'Example book descrition 0',
-        },
-        {
-        'id': 1,
-        'date': str(datetime(2023, 2, 24, 15, 58, 36, 194402)),
-        'title': 'Book 1',
-        'link': 'https://example.com/',
-        'description': 'Example book descrition 1',
-        }]
+
+    books_page = get_books_page((page - 1) * per_page, page * per_page, sorting_arg, reverse_arg, filterby_arg, filterword_arg)
+    db_sess.close()
 
     pages_buttons = \
         [page_button for page_button in \
          [(i + (page - 4 if 4 < page <= pages_amount - 4 else 0 if page < pages_amount - 4 else pages_amount - 7)) \
           if pages_amount >= 7 else i \
           for i in range(1, min(7, pages_amount) + 1)] if page_button > 0 and page_button <= pages_amount] 
-    searchby = {'source': 'источнику', 'title': 'названию', 'description': 'описанию'}[filterby_arg]
+    parameters = {'author': 'автору', 'title': 'названию',
+                  'description': 'описанию', 'genre': 'жанру',
+                  'title': 'названию', 'creation_year': 'году написания'}
     
     # books_page = [book | {'img_source': f"{'_'.join(book['link'].split('.')[:2])}.jpg"} for book in books_page]
         
@@ -102,8 +121,9 @@ def home():
     #   http://localhost/?sort=title&r=1  Sorting by 'title' with reverse
 
     return render_template('index.html', books=books_page, pages_buttons=pages_buttons, pages_amount=pages_amount,\
-                           searchby=searchby, getparam=getparam, page=page, pagestr=str(page), qs=query_string,\
-                           rmparams=rmparams, addparam=addparam, reverse=reverse_arg, current_user=current_user)
+                           getparam=getparam, page=page, pagestr=str(page), qs=query_string,\
+                           rmparams=rmparams, addparam=addparam, reverse=reverse_arg, current_user=current_user,\
+                           sorting=sorting_arg, filter=filterby_arg, parameters=parameters)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -150,6 +170,7 @@ def registration():
             db_sess = db_session.create_session()
             db_sess.add(user)
             db_sess.commit()
+            db_sess.close()
             flash(message='Регистрация успешна', category='success')
             return redirect('/login')
         except:
@@ -190,15 +211,21 @@ def upload():
             book.author = author
             book.description = description
             book.genre = genre
-            book.created_date = created_date
+            book.creation_year = created_date
             book.file_url = f'static/books/{full_file_name}'
             book.user_id = current_user.id
 
             db_sess.add(book)
             db_sess.commit()
+            db_sess.close()
             flash(message='Книга добавлена', category='success')
         
     return render_template('upload.html')
+
+
+@app.route('/book/<int:id>')
+def book(id):
+    return render_template('book.html', id=id)
 
 
 if __name__ == '__main__':
