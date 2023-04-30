@@ -314,4 +314,5 @@ def book(id):
 
 
 if __name__ == '__main__':
+    db_session.global_init("db/data.db")
     app.run()
