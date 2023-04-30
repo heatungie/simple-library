@@ -1,5 +1,4 @@
-from flask import Flask, render_template, request, flash, redirect
-from sqlalchemy import func, desc, orm
+from flask import Flask, render_template, request, flash, redirect, send_file
 from urllib.parse import unquote_plus
 from data import db_session
 from data.users import User
@@ -62,7 +61,7 @@ def getparam(query_string, param_to_get):
     param_to_return = [param.split('=')[1] for param in params if param.split('=')[0] == param_to_get]
     return unquote_plus(param_to_return[0]) if param_to_return else ''
 
-# getattr(Study, order_by_column)
+
 def get_books_page(start, end, sortby, reverse_arg, filterby, filterword):
     db_sess = db_session.create_session()
     reverse = ('desc' if reverse_arg else 'asc')
@@ -77,8 +76,34 @@ def get_books_page(start, end, sortby, reverse_arg, filterby, filterword):
     return [book.__dict__ for book in query]
 
 
+def get_books_favorite(start, end, sortby, reverse_arg, filterby, filterword, favorite):
+    db_sess = db_session.create_session()
+    reverse = ('desc' if reverse_arg else 'asc')
+
+    query = (db_sess.query(Books)
+             .filter((getattr(Books, filterby).like(f'%{filterword}%') | \
+                      (getattr(Books, filterby).like(f'%{filterword.capitalize()}%'))))
+             .filter(Books.id.in_(favorite))
+             .order_by(getattr(getattr(Books, sortby), reverse)())
+             .slice(start, end))
+
+    db_sess.close()
+    return [book.__dict__ for book in query]
+
+
+def trim_string(s):
+    if len(s) <= 500:
+        return s
+    return f'{s[:500 - 1]}…'
+
+
+@app.route('/favorite', methods=['GET', 'POST'])
 @app.route('/', methods=['GET', 'POST'])
 def home():
+    isfavorite = request.path == '/favorite'
+    if isfavorite and not current_user.get_id():
+        return redirect('/')
+    
     args = request.args
     sorting_arg, reverse_arg, per_page_arg, page_arg, filterby_arg, filterword_arg = \
         args.get('sort', default='id'), 'r' in args and args.get('r') != '0', args.get('perpage', default='8'), \
@@ -92,25 +117,31 @@ def home():
 
     db_sess = db_session.create_session()
     library_size = db_sess.query(Books).count()
+    db_sess.close()
 
     pages_amount = int(library_size / per_page + 0.9)
-
     page = int(page_arg) if page_arg.isdecimal() and 1 <= int(page_arg) <= pages_amount \
         else 1 if int(page_arg) <= pages_amount else pages_amount
-
-    books_page = get_books_page((page - 1) * per_page, page * per_page, sorting_arg, reverse_arg, filterby_arg, filterword_arg)
-    db_sess.close()
+    
+    if isfavorite:
+        favorite = current_user.books_favorited.strip(';').split(';')
+        print(favorite)
+        books_page = get_books_favorite((page - 1) * per_page, page * per_page,
+                                         sorting_arg, reverse_arg, filterby_arg, filterword_arg, favorite)
+    else:
+        books_page = get_books_page((page - 1) * per_page, page * per_page,
+                                     sorting_arg, reverse_arg, filterby_arg, filterword_arg)
+    
 
     pages_buttons = \
         [page_button for page_button in \
          [(i + (page - 4 if 4 < page <= pages_amount - 4 else 0 if page < pages_amount - 4 else pages_amount - 7)) \
           if pages_amount >= 7 else i \
           for i in range(1, min(7, pages_amount) + 1)] if page_button > 0 and page_button <= pages_amount] 
+    
     parameters = {'author': 'автору', 'title': 'названию',
                   'description': 'описанию', 'genre': 'жанру',
                   'title': 'названию', 'creation_year': 'году написания'}
-    
-    # books_page = [book | {'img_source': f"{'_'.join(book['link'].split('.')[:2])}.jpg"} for book in books_page]
         
     # Pages usage examples:
     #   http://localhost/?p=0&perpage=15   Page 0 with 15 books on each
@@ -121,9 +152,10 @@ def home():
     #   http://localhost/?sort=title&r=1  Sorting by 'title' with reverse
 
     return render_template('index.html', books=books_page, pages_buttons=pages_buttons, pages_amount=pages_amount,\
-                           getparam=getparam, page=page, pagestr=str(page), qs=query_string,\
-                           rmparams=rmparams, addparam=addparam, reverse=reverse_arg, current_user=current_user,\
-                           sorting=sorting_arg, filter=filterby_arg, parameters=parameters)
+                           getparam=getparam, page=page, pagestr=str(page), qs=query_string, rmparams=rmparams,\
+                           addparam=addparam, reverse=reverse_arg, current_user=current_user, sorting=sorting_arg,\
+                           filter=filterby_arg, parameters=parameters, isfavorite=request.path == '/favorite',\
+                           trim_string=trim_string)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -133,12 +165,10 @@ def login():
     
     if request.method == 'POST':
         login, password = request.form['login'], request.form['password']
-        # print(request.form, login, password)
         try:
             db_sess = db_session.create_session()
             user = db_sess.query(User).filter(User.login == login).first()
             check_pass = user.check_password(password)
-            # print(user)
             if user and check_pass:
                 login_user(user, remember=False)
                 return redirect("/")
@@ -167,6 +197,7 @@ def registration():
             user.name = name
             user.surname = surname
             user.hashed_password = user.hash_password(password)
+            user.books_favorited = ''
             db_sess = db_session.create_session()
             db_sess.add(user)
             db_sess.commit()
@@ -223,30 +254,64 @@ def upload():
     return render_template('upload.html')
 
 
-@app.route('/book/<int:id>')
+@app.route('/book/<int:id>', methods=['GET', 'POST'])
 def book(id):
-    return render_template('book.html', id=id)
+
+    favorited = f'{id}' in current_user.books_favorited
+
+    if request.method == 'POST':
+        enter = request.form['enter']
+
+        if enter == 'download':
+            print(request.form)
+            file_name = request.form['file_name']
+            book_name = request.form['book_name']
+            print(file_name)
+            directory = path.join(app.root_path, f"{app.config['UPLOAD_FOLDER']}/{file_name}")
+            return send_file(directory, as_attachment=True, download_name=f'{book_name}.{file_name.split(".")[-1]}')
+        
+        elif enter == 'favorite':
+            book_id = request.form['book_id']
+            try:
+                db_sess = db_session.create_session()
+                user = db_sess.query(User).filter(User.id == current_user.id).one()
+                
+                if (not user.books_favorited) or (user.books_favorited and not book_id in user.books_favorited.split(';')):
+                    setattr(user, 'books_favorited',
+                            ';'.join(user.books_favorited.split(';') + [book_id]) if user.books_favorited else book_id)
+                    
+                db_sess.commit()
+                db_sess.close()
+                favorited = True
+            except Exception as e:
+                print(e)
+
+        elif enter == 'unfavorite':
+            book_id = request.form['book_id']
+            try:
+                db_sess = db_session.create_session()
+                user = db_sess.query(User).filter(User.id == current_user.id).one()
+                print(book_id)
+                print(';'.join([b_id for b_id in user.books_favorited if b_id != book_id]))
+                setattr(user, 'books_favorited', ';'.join([b_id for b_id in user.books_favorited if b_id != book_id]))
+
+                db_sess.commit()
+                db_sess.close()
+                favorited = False
+            except Exception as e:
+                print(e)
+
+    try:
+        db_sess = db_session.create_session()
+        book = db_sess.query(Books).filter(Books.id == id).one()
+    except Exception as e:
+        print(e)
+        return "Not found", 404
+    print(f'{id}' in current_user.books_favorited)
+    
+    return render_template('book.html', id=id, book=book, user_id = current_user.get_id(),\
+                           favorited=favorited)
 
 
 if __name__ == '__main__':
-    db_session.global_init("db/data.db")
-    # for i in range(3):
-    #     user = User()
-    #     user.name = f"Пользователь {i}"
-    #     user.surname = f"Пользователев {i}"
-    #     user.hashed_password = 'password'
-    #     db_sess = db_session.create_session()
-    #     db_sess.add(user)
-    #     db_sess.commit()
-    
-    # user = db_sess.query(User).filter(User.id == 1).first()
-    # books = Books(title="Личная запись1", description="Эта запись личная1")
-    # user.books.append(books)
-    # db_sess.commit()
-
-    # user = User()
-    # db_sess = db_session.create_session()
-    # for user in db_sess.query(User).all():
-    #     print(user)
-
     app.run()

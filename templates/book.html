@@ -1,9 +1,44 @@
 {% extends 'base.html' %}
 
 {% block title %}
-Home page
+{{ book.title }} - Simple Library
 {% endblock %}
 
 {% block body %}
-{{id}}
+<div class="book-container">
+    <div class="book-wrap">
+        <div class="book-tile title">{{ book.title }}</div>
+        <div class="book-tile cover">
+            <img src="{{ url_for('static', filename='img/book.png') }}" class="page-img">
+        </div>
+        <div class="book-tile book-buttons-wrap">
+            {% if user_id %}
+            <div class="book-button-container">
+                
+                <form method="post">
+                    <input type="hidden" name="book_id" value="{{ book.id }}">
+                    <button name="enter" type="submit" class="book-button"
+                    {% if not favorited %} 
+                        value="favorite">Добавить в избранное</button> 
+                    {% else %} 
+                        value="unfavorite">Удалить из избранного</button> 
+                    {% endif %}
+                </form>
+                <!-- <a href="#" class="book-button">Добавить в избранное</a> -->
+            </div>
+            {% endif %}
+            <div class="book-button-container">
+                <form method="post">
+                    <input type="hidden" name="file_name" value="{{ book.file_url.split('/')[-1] }}">
+                    <input type="hidden" name="book_name" value="{{ book.title }} - {{ book.author }}">
+                    <button name="enter" type="submit" class="book-button" value="download">Скачать книгу</button>
+                </form>
+            </div>
+        </div>
+        <div class="book-tile author">Автор: {{ book.author }}</div>
+        <div class="book-tile genre">Жанр: {{ book.genre }}</div>
+        <div class="book-tile year">Год написания: {{ book.creation_year }}</div>
+        <div class="book-tile description">Описание: {{ book.description }}</div>
+    </div>
+</div>
 {% endblock %}
